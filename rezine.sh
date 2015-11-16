@@ -557,9 +557,8 @@ configure_DKIM() {
 }
 
 display_win_message() {
-    ip6=$(ifconfig | grep -C4 tun0 | awk '/inet6 addr/{print $3}' | sed 's/\/64//' || echo 'ERROR')
-#    ip4=$(ifconfig | grep -C4 tun0 | awk '/inet addr/{print substr($2,6)}' || echo 'ERROR')
-    ip4=$(ifconfig tun0 | grep 'inet adr:' | cut -d: -f2 |  awk '{ print $1}' || echo 'ERROR')
+    ip6=$(ip addr show tun0 | awk -F'[/ ]' '/inet6/{print $6}' | head -n1 || echo 'ERROR')
+    ip4=$(ip addr show tun0 | awk -F'[/ ]' '/inet /{print $6}' || echo 'ERROR')
 
 wget http://www.rezine.org/files/footer-install-propolis.txt -q -O -
 
