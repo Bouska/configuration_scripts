@@ -299,11 +299,8 @@ remove_dyndns_cron() {
 
 
 display_win_message() {
-    ip6=$(ifconfig tun0 | awk '/adr inet6/{print $3}' | sed 's/\/64//' || echo 'ERROR')
-    if [ -z "$ip6" ]; then
-        ip6=$(ifconfig tun0 | awk '/inet6 adr/{print $3}' | sed 's/\/64//' || echo 'ERROR')
-    fi
-    ip4=$(ifconfig tun0 | awk '/inet adr/{print substr($2,5)}' || echo 'ERROR')
+    ip6=$(ip addr show tun0 | awk -F'[/ ]' '/inet6/{print $6}' | head -n1 || echo 'ERROR')
+    ip4=$(ip addr show tun0 | awk -F'[/ ]' '/inet /{print $6}'  || echo 'ERROR')
 
     echo -e "\nVotre $cubename a été correctement configurée."
 
