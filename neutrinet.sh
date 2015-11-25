@@ -241,6 +241,7 @@ _xmpp-server._tcp 14400 IN SRV 0 5 5269 $domain.
 @ 14400 IN TXT "v=spf1 a mx ip4:$ip4 ip6:$ip6 -all"
 
 $(cat /etc/dkim/$domain.mail.txt > /dev/null 2>&1 || echo '')
+_dmarc 14400 IN TXT "v=DMARC1; p=none; rua=mailto:postmaster@$domain"
 
 EOF
 
