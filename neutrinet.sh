@@ -221,8 +221,8 @@ restart_api() {
 }
 
 display_win_message() {
-    ip6=$(ip -6 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' | head -n1 || echo 'ERROR')
-    ip4=$(ip -4 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' | head -n1 || echo 'ERROR')
+    ip6=$(ip -6 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' || echo 'ERROR')
+    ip4=$(ip -4 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' || echo 'ERROR')
 
     cat <<EOF
 
@@ -230,15 +230,13 @@ VICTOIRE !
 
 Your Cube has been configured properly. Please set your DNS records as below:
 
-@ 14400 IN A $ip4
-* 14400 IN A $ip4
-@ 14400 IN AAAA $ip6
-* 14400 IN AAAA $ip6
+$(for ip in $ip4 $ip6; do echo "@ 14400 IN A $ip"; echo "* 14400 IN A $ip"; done;)
+
 _xmpp-client._tcp 14400 IN SRV 0 5 5222 $domain.
 _xmpp-server._tcp 14400 IN SRV 0 5 5269 $domain.
 
 @ 14400 IN MX 5 $domain.
-@ 14400 IN TXT "v=spf1 a mx ip4:$ip4 ip6:$ip6 -all"
+@ 14400 IN TXT "v=spf1 a mx $(for ip in $ip4; do echo "ip4:$ip"; done;) $(for ip in $ip6; do echo "ip6:$ip"; done;) -all"
 
 $(cat /etc/dkim/$domain.mail.txt > /dev/null 2>&1 || echo '')
 _dmarc 14400 IN TXT "v=DMARC1; p=none; rua=mailto:postmaster@$domain"
