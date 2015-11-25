@@ -221,8 +221,8 @@ restart_api() {
 }
 
 display_win_message() {
-    ip6=$(ip -6 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' || echo 'ERROR')
-    ip4=$(ip -4 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' || echo 'ERROR')
+    ip6=$(ip -6 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' | head -n1 || echo 'ERROR')
+    ip4=$(ip -4 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' | head -n1 || echo 'ERROR')
 
     cat <<EOF
 
