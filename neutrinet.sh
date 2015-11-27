@@ -236,7 +236,7 @@ _xmpp-client._tcp 14400 IN SRV 0 5 5222 $domain.
 _xmpp-server._tcp 14400 IN SRV 0 5 5269 $domain.
 
 @ 14400 IN MX 5 $domain.
-@ 14400 IN TXT "v=spf1 a mx $(for ip in $ip4; do echo "ip4:$ip"; done;) $(for ip in $ip6; do echo "ip6:$ip"; done;) -all"
+@ 14400 IN TXT "v=spf1 a mx $(for ip in $ip4; do echo -n "ip4:$ip "; done;) $(for ip in $ip6; do echo -n "ip6:$ip "; done;) -all"
 
 $(cat /etc/dkim/$domain.mail.txt > /dev/null 2>&1 || echo '')
 _dmarc 14400 IN TXT "v=DMARC1; p=none; rua=mailto:postmaster@$domain"
