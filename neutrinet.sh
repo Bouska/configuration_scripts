@@ -64,6 +64,10 @@ get_variables() {
         echo "i.e.: MyWunderbarNeutralNetwork"
         read wifi_ssid
         echo
+        echo "Install DKIM? (recommended if you want a perfect email server, not needed otherwise)"
+        echo "(Yes/No)"
+        read install_dkim
+        echo
         echo
         echo "The installation will proceed, please verify the parameters above one last time."
         read -rsp $'Press any key to continue...\n' -n1 yolo
@@ -123,7 +127,7 @@ configure_vpnclient() {
 
     # Restrict user access to the app
     yunohost app addaccess vpnclient -u $username
-    
+
     # Neutrinet related: add some VPN configuration directives
     cat >> /etc/openvpn/client.conf.tpl <<EOF
 
@@ -158,15 +162,15 @@ EOF
     yunohost app setting vpnclient server_port -v "1194"
     yunohost app setting vpnclient server_proto -v "udp"
     yunohost app setting vpnclient service_enabled -v "1"
-    
+
     yunohost app setting vpnclient login_user -v "$vpn_username"
     yunohost app setting vpnclient login_passphrase -v "$vpn_pwd"
-    
+
     yunohost app setting vpnclient ip6_net -v "$ip6_net"
 
     # Add the service to YunoHost's monitored services
     yunohost service add ynh-vpnclient -l /var/log/openvpn-client.log
-    
+
     echo "Restarting OpenVPN..."
     systemctl restart ynh-vpnclient \
       || (echo "Logs:" && cat /var/log/openvpn-client.log && exit 1)
@@ -220,6 +224,84 @@ restart_api() {
     systemctl restart yunohost-api
 }
 
+configure_DKIM() {
+    if [ "$install_dkim" = "Yes" ]; then
+        echo "Configuring the DKIM..."
+
+        # Install OpenDKIM
+        apt-get install -y opendkim opendkim-tools > /dev/null 2>&1;
+
+        # Create OpenDKIM config
+        cat > /etc/opendkim.conf <<EOF
+
+AutoRestart Yes
+AutoRestartRate 10/1h
+UMask 022
+Syslog yes
+SyslogSuccess Yes
+LogWhy Yes
+
+Canonicalization relaxed/simple
+
+ExternalIgnoreList refile:/etc/opendkim/TrustedHosts
+InternalHosts refile:/etc/opendkim/TrustedHosts
+KeyTable refile:/etc/opendkim/KeyTable
+SigningTable refile:/etc/opendkim/SigningTable
+
+Mode sv
+PidFile /var/run/opendkim/opendkim.pid
+SignatureAlgorithm rsa-sha256
+
+UserID opendkim:opendkim
+
+Socket inet:8891@127.0.0.1
+
+Selector mail
+
+EOF
+
+        # Configure OpenDKIM's socket
+        echo sudo echo "SOCKET=\"inet:8891@localhost\"" >> /etc/default/opendkim
+
+        # Configure postfix to use OpenDKIM
+        cat >> /etc/postfix/main.cf <<EOF
+# OpenDKIM milter
+milter_protocol = 2
+milter_default_action = accept
+smtpd_milters = inet:127.0.0.1:8891
+non_smtpd_milters = inet:127.0.0.1:8891
+EOF
+
+        # Add TrustedHosts
+        cat > /etc/opendkim/TrustedHosts <<EOF
+127.0.0.1
+localhost
+10.0.0.0/8
+*.$domain
+EOF
+
+        # Add Keytable
+        echo "mail._domainkey.$domain $domain:mail:/etc/opendkim/keys/$domain/mail.private" > /etc/opendkim/KeyTable
+
+        # Add SigningTable
+        echo "*@$domain mail._domainkey.$domain" > /etc/opendkim/SigningTable
+
+        # Create DKIM keys
+        mkdir -pv /etc/opendkim/keys/$domain
+        cd /etc/opendkim/keys/$domain
+        opendkim-genkey -s mail -d $domain
+
+        # Set rights
+        chown -Rv opendkim:opendkim /etc/opendkim*
+
+        # Restart OpenDKIM & postfix
+        echo "Restarting OpenDKIM & postfix..."
+        service opendkim restart
+        service postfix restart
+
+    fi
+}
+
 display_win_message() {
     ip6=$(ip -6 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' || echo 'ERROR')
     ip4=$(ip -4 addr show tun0 | awk -F'[/ ]' '/inet/{print $6}' || echo 'ERROR')
@@ -238,7 +320,7 @@ _xmpp-server._tcp 14400 IN SRV 0 5 5269 $domain.
 @ 14400 IN MX 5 $domain.
 @ 14400 IN TXT "v=spf1 a mx $(for ip in $ip4; do echo -n "ip4:$ip "; done;) $(for ip in $ip6; do echo -n "ip6:$ip "; done;) -all"
 
-$(cat /etc/dkim/$domain.mail.txt > /dev/null 2>&1 || echo '')
+$(cat /etc/opendkim/keys/$domain/mail.txt > /dev/null 2>&1 || echo '')
 _dmarc 14400 IN TXT "v=DMARC1; p=none; rua=mailto:postmaster@$domain"
 
 EOF
@@ -273,6 +355,6 @@ configure_hostpot
 
 remove_dyndns_cron
 restart_api
+configure_DKIM
 
 display_win_message
-
